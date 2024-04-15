@@ -1,15 +1,17 @@
 import { initSockets } from "./sockets";
-import { setupMessageSending, displayChatMessage, updateTotalUsersCount } from "./ui";
+import { setupMessageSending, displayChatMessage, updateTotalUsersCount, updateUserName } from "./ui";
 import { getUserId, getUserName, setUserId } from "./ui/user";
 import { showToast } from "./ui/toasts";
 
 function setupEvents() {
     const socket = initSockets();
+    const userName = getUserName();
 
-    socket.emit('join', getUserName());
+    socket.emit('join', userName);
 
     socket.on('connect', () => {
         setUserId(socket.id);
+        updateUserName(userName);
     });
 
     socket.on('disconnect', () => {
