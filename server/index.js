@@ -1,40 +1,77 @@
-// server.js
+/**
+ * This file initializes an Express application, sets up HTTP and Socket.IO servers, and defines event listeners for socket connections.
+ * @module server
+ */
 
-const app = require("express")();
+const express = require("express");
+const app = express();
 const http = require("http").Server(app);
-const io = require("socket.io")(http);
+/** @type {import('socket.io').Server} */
+const io = require("socket.io")(http, {
+    cors: {
+        origin: "http://localhost:1234",
+        credentials: true
+    }
+});
 const path = require("path");
 const { userJoin, userLeave, getConnectedUsers } = require('./helpers/userManager');
 
-app.get("/", (req, res) => {
-    res.sendFile(path.resolve('index.html'));
-});
-
+/**
+ * Event listener for socket connection.
+ * @name connection
+ * @function
+ * @memberof module:server
+ * @param {import('socket.io').Socket} socket - The socket object representing a client connection.
+ * @returns {void}
+ */
 io.on('connection', (socket) => {
+    /**
+     * Event listener for a user joining the chat.
+     * @name join
+     * @function
+     * @memberof module:server~connection
+     * @param {string} username - The username of the joining user.
+     * @returns {void}
+     */
     socket.on('join', (username) => {
         userJoin(socket.id, username);
-        io.emit('userJoined', { username });
-        // Send updated user count and list to all clients
-        io.emit('updateUsers', { users: Array.from(getConnectedUsers()) });
+        io.emit('user:join', { username });
+        io.emit('users:update:count', { users: Array.from(getConnectedUsers()) });
     });
 
-    socket.on('chatMessage', (message) => {
+    /**
+     * Event listener for receiving chat messages.
+     * @name chat:message
+     * @function
+     * @memberof module:server~connection
+     * @param {string} message - The message sent by the user.
+     * @returns {void}
+     */
+    socket.on('chat:message', (message) => {
         const sender = getSenderUsername(socket.id);
-        // Broadcast the message to all clients except the sender
         io.emit('message', { id: socket.id, sender, message });
     });
 
+    /**
+     * Event listener for socket disconnection.
+     * @name disconnect
+     * @function
+     * @memberof module:server~connection
+     * @returns {void}
+     */
     socket.on('disconnect', () => {
         const user = userLeave(socket.id);
         if (user) {
-            io.emit('userLeft', { username: user.username });
-            io.emit('updateUsers', { users: Array.from(getConnectedUsers()) });
+            io.emit('user:left', { username: user.username });
+            io.emit('users:update:count', { users: Array.from(getConnectedUsers()) });
         }
     });
 });
 
 /**
- * Get the username of a user given their ID.
+ * Retrieves the username of a user given their ID.
+ * @function
+ * @memberof module:server
  * @param {string} id - The unique identifier of the user.
  * @returns {string} - The username of the user.
  */
@@ -44,6 +81,14 @@ function getSenderUsername(id) {
 }
 
 const PORT = process.env.PORT || 3000;
+
+/**
+ * Starts the HTTP server.
+ * @function
+ * @memberof module:server
+ * @param {number} PORT - The port number on which the server will listen.
+ * @returns {void}
+ */
 http.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
 });
